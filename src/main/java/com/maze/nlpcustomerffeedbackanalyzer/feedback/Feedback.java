@@ -1,4 +1,4 @@
-package com.maze.nlpcustomerffeedbackanalyzer;
+package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 
 import jakarta.persistence.*;
 import lombok.*;

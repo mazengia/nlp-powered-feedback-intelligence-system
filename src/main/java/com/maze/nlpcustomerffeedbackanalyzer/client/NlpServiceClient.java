@@ -1,4 +1,4 @@
-package com.maze.nlpcustomerffeedbackanalyzer;
+package com.maze.nlpcustomerffeedbackanalyzer.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

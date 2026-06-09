@@ -1,6 +1,5 @@
-package com.maze.nlpcustomerffeedbackanalyzer;
+package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 
-import com.maze.nlpcustomerffeedbackanalyzer.feedback.Feedback;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;

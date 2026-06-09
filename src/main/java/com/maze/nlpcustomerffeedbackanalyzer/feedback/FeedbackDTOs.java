@@ -1,4 +1,4 @@
-package com.maze.nlpcustomerffeedbackanalyzer;
+package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 
  import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

@@ -1,6 +1,5 @@
-package com.maze.nlpcustomerffeedbackanalyzer;
+package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 
-import com.maze.nlpcustomerffeedbackanalyzer.feedback.Feedback;
 import com.maze.nlpcustomerffeedbackanalyzer.feedback.FeedbackDTOs.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

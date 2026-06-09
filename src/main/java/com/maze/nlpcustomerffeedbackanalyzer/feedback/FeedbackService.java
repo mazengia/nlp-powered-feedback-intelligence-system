@@ -1,9 +1,9 @@
-package com.maze.nlpcustomerffeedbackanalyzer;
+package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.maze.nlpcustomerffeedbackanalyzer.feedback.Feedback;
+import com.maze.nlpcustomerffeedbackanalyzer.client.NlpServiceClient;
 import com.maze.nlpcustomerffeedbackanalyzer.feedback.FeedbackDTOs.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public class FeedbackService {
 
     private final FeedbackRepository   repository;
-    private final NlpServiceClient     nlpClient;
+    private final NlpServiceClient nlpClient;
     private final ObjectMapper         mapper = new ObjectMapper();
 
     // ─── Analyze Single Feedback ──────────────────────────────────────────

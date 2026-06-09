@@ -1,4 +1,4 @@
-package com.maze.nlpcustomerffeedbackanalyzer;
+package com.maze.nlpcustomerffeedbackanalyzer.exception;
 
 import com.maze.nlpcustomerffeedbackanalyzer.feedback.FeedbackDTOs;
 import lombok.extern.slf4j.Slf4j;
