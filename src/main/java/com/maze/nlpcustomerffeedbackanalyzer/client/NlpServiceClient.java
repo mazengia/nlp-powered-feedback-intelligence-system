@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.maze.nlpcustomerffeedbackanalyzer.exception.NlpServiceException;
 import com.maze.nlpcustomerffeedbackanalyzer.feedback.Feedback;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -16,6 +19,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * HTTP client for the NLP Flask server running on Google Colab,
@@ -51,6 +55,9 @@ public class NlpServiceClient {
 
     // ── Public API ────────────────────────────────────────────────────────
 
+    @CircuitBreaker(name = "nlpService", fallbackMethod = "analyzeOneFallback")
+    @Retry(name = "nlpService")
+    @RateLimiter(name = "api")
     public JsonNode analyzeOne(String text, Feedback.FeedbackType feedbackType, String source) {
         ObjectNode body = mapper.createObjectNode();
         body.put("text",          text);
@@ -59,6 +66,9 @@ public class NlpServiceClient {
         return post("/api/analyze", body);
     }
 
+    @CircuitBreaker(name = "nlpService", fallbackMethod = "analyzeBatchFallback")
+    @Retry(name = "nlpService")
+    @RateLimiter(name = "api")
     public JsonNode analyzeBatch(List<Map<String, String>> feedbacks) {
         if (feedbacks.size() > maxBatchSize) {
             throw new NlpServiceException("Batch size %d exceeds limit of %d".formatted(feedbacks.size(), maxBatchSize));
@@ -76,22 +86,30 @@ public class NlpServiceClient {
         return post("/api/analyze/batch", body);
     }
 
+    @Retry(name = "nlpService")
+    @RateLimiter(name = "api")
     public JsonNode getSentiment(String text) {
         return post("/api/sentiment", textBody(text));
     }
 
+    @Retry(name = "nlpService")
+    @RateLimiter(name = "api")
     public JsonNode getTopics(String text, String feedbackType) {
         ObjectNode body = textBody(text);
         body.put("feedback_type", feedbackType);
         return post("/api/topics", body);
     }
 
+    @Retry(name = "nlpService")
+    @RateLimiter(name = "api")
     public JsonNode getKeyphrases(String text, int topN) {
         ObjectNode body = textBody(text);
         body.put("top_n", topN);
         return post("/api/keyphrases", body);
     }
 
+    @Retry(name = "nlpService")
+    @RateLimiter(name = "api")
     public JsonNode getSummary(String text) {
         return post("/api/summarize", textBody(text));
     }
@@ -151,6 +169,24 @@ public class NlpServiceClient {
         }
     }
 
+    // ── Fallback Methods for Circuit Breaker ──────────────────────────────
 
+    public JsonNode analyzeOneFallback(String text, Feedback.FeedbackType feedbackType, String source, Exception ex) {
+        log.warn("Circuit breaker triggered for NLP service, returning fallback response");
+        ObjectNode fallback = mapper.createObjectNode();
+        fallback.put("status", "service_unavailable");
+        fallback.put("message", "NLP service temporarily unavailable. Please retry later.");
+        fallback.put("error", ex.getMessage());
+        return fallback;
+    }
 
+    public JsonNode analyzeBatchFallback(List<Map<String, String>> feedbacks, Exception ex) {
+        log.warn("Circuit breaker triggered for batch analysis, returning fallback response");
+        ObjectNode fallback = mapper.createObjectNode();
+        fallback.put("status", "service_unavailable");
+        fallback.put("message", "NLP service temporarily unavailable for batch processing.");
+        fallback.put("error", ex.getMessage());
+        fallback.put("processed_count", 0);
+        return fallback;
+    }
 }

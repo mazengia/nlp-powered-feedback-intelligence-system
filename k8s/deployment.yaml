@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feedback-analyzer
+  namespace: feedback-system
+  labels:
+    app: feedback-analyzer
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: feedback-analyzer
+  template:
+    metadata:
+      labels:
+        app: feedback-analyzer
+        version: v1
+    spec:
+      serviceAccountName: feedback-analyzer
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: feedback-analyzer
+        image: your-registry/feedback-analyzer:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
+        - name: JAVA_OPTS
+          value: "-Xms256m -Xmx512m -XX:+UseG1GC"
+        - name: SERVER_PORT
+          value: "8080"
+        - name: DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: feedback-analyzer-config
+              key: db.url
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: feedback-analyzer-secrets
+              key: db.user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: feedback-analyzer-secrets
+              key: db.password
+        - name: NLP_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: feedback-analyzer-config
+              key: nlp.base-url
+        - name: NLP_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: feedback-analyzer-config
+              key: nlp.timeout-seconds
+        - name: NLP_MAX_BATCH
+          valueFrom:
+            configMapKeyRef:
+              name: feedback-analyzer-config
+              key: nlp.max-batch-size
+
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 40
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log/feedback-analyzer
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - feedback-analyzer
+              topologyKey: kubernetes.io/hostname
+
+      volumes:
+      - name: logs
+        emptyDir: {}
+

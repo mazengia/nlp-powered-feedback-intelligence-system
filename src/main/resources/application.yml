@@ -22,6 +22,13 @@ spring:
     console:
       enabled: ${H2_CONSOLE:true}
       path: /h2-console
+  task:
+    execution:
+      pool:
+        core-size: 2
+        max-size: 10
+        queue-capacity: 100
+      thread-name-prefix: feedback-async-
 
 server:
   port: 8080
@@ -42,12 +49,27 @@ springdoc:
 
 nlp:
   service:
-    base-url: ${NLP_BASE_URL:https://c04a-8-229-130-155.ngrok-free.app}
+    base-url: ${NLP_BASE_URL:https://1eb3-34-127-27-176.ngrok-free.app}
     timeout-seconds: ${NLP_TIMEOUT:60}
     max-batch-size: ${NLP_MAX_BATCH:50}
+
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+  endpoint:
+    health:
+      show-details: always
 
 logging:
   level:
     com.maze.nlpcustomerffeedbackanalyzer: DEBUG
     org.springframework.web: INFO
     org.hibernate.SQL: WARN
+
+audit:
+  enabled: true
+  log-changes: true

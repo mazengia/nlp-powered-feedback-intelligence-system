@@ -3,17 +3,20 @@ package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.maze.nlpcustomerffeedbackanalyzer.audit.Auditable;
 import com.maze.nlpcustomerffeedbackanalyzer.client.NlpServiceClient;
 import com.maze.nlpcustomerffeedbackanalyzer.feedback.FeedbackDTOs.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,6 +31,7 @@ public class FeedbackService {
     // ─── Analyze Single Feedback ──────────────────────────────────────────
 
     @Transactional
+    @Auditable("Analyze single feedback")
     public FeedbackResponse analyzeFeedback(FeedbackRequest request) {
         // 1. Persist with PENDING status
         Feedback feedback = Feedback.builder()
@@ -65,11 +69,19 @@ public class FeedbackService {
         }
     }
 
-    // ─── Batch Analyze ────────────────────────────────────────────────────
+    // ─── Batch Analyze (Async Processing) ──────────────────────────────────
+
+    @Transactional
+    @Async
+    @Auditable("Batch analyze feedbacks")
+    public CompletableFuture<BatchFeedbackResponse> analyzeBatchAsync(BatchFeedbackRequest batchRequest) {
+        return CompletableFuture.completedFuture(analyzeBatch(batchRequest));
+    }
 
     @Transactional
     public BatchFeedbackResponse analyzeBatch(BatchFeedbackRequest batchRequest) {
         List<FeedbackRequest> feedbackRequests = batchRequest.getFeedbacks();
+        log.info("Starting batch analysis of {} feedbacks", feedbackRequests.size());
 
         // Save all as ANALYZING
         List<Feedback> entities = feedbackRequests.stream().map(req ->
@@ -113,6 +125,8 @@ public class FeedbackService {
         }
 
         InsightsResult insights = mapInsights(nlpInsights);
+        log.info("Batch analysis completed: {} succeeded, {} failed",
+                responses.size(), entities.size() - responses.size());
 
         return BatchFeedbackResponse.builder()
                 .count(responses.size())

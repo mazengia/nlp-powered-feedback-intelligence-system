@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feedback-analyzer-config
+  namespace: feedback-system
+data:
+  db.url: "jdbc:postgresql://feedback-postgres-service:5432/feedback_analyzer"
+  db.driver: "org.postgresql.Driver"
+  db.dialect: "org.hibernate.dialect.PostgreSQLDialect"
+  db.pool.size: "20"
+  nlp.base-url: "http://nlp-service:8000"
+  nlp.timeout-seconds: "30"
+  nlp.max-batch-size: "50"
+  server.port: "8080"
+  logging.level.root: "WARN"
+  logging.level.app: "INFO"
+  # Resilience4j configurations
+  resilience4j.circuitbreaker.instances.nlpService.slidingWindowSize: "100"
+  resilience4j.circuitbreaker.instances.nlpService.failureRateThreshold: "50"
+  resilience4j.retry.instances.nlpService.maxAttempts: "3"
+  resilience4j.ratelimiter.instances.api.limitForPeriod: "100"
+

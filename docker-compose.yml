@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: feedback-analyzer-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-feedback_analyzer}
+      POSTGRES_USER: ${DB_USER:-feedback_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-feedback_secure_pwd}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - feedback-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-feedback_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: feedback-analyzer-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-feedback_analyzer}
+      DB_USER: ${DB_USER:-feedback_user}
+      DB_PASSWORD: ${DB_PASSWORD:-feedback_secure_pwd}
+      DB_DRIVER: org.postgresql.Driver
+      JPA_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      DDL_AUTO: validate
+      NLP_BASE_URL: ${NLP_BASE_URL:-http://nlp-service:8000}
+      NLP_TIMEOUT: 30
+      NLP_MAX_BATCH: 50
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/var/log/feedback-analyzer
+    networks:
+      - feedback-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: NLP Flask microservice (if running locally)
+  # nlp-service:
+  #   build:
+  #     context: ./nlp-service
+  #     dockerfile: Dockerfile
+  #   container_name: feedback-nlp-service
+  #   ports:
+  #     - "5000:8000"
+  #   environment:
+  #     - FLASK_ENV=production
+  #   networks:
+  #     - feedback-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  feedback-network:
+    driver: bridge
+

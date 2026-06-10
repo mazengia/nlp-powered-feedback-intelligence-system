@@ -1,0 +1,163 @@
+spring:
+  application:
+    name: customer-feedback-analyzer
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/feedback_analyzer}
+    driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+    username: ${DB_USER:feedback_user}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: ${JPA_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
+    hibernate:
+      ddl-auto: ${DDL_AUTO:validate}
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+  compression:
+    enabled: true
+    mime-types:
+      - application/json
+      - application/xml
+      - text/html
+    min-response-size: 1024
+  servlet:
+    context-path: ${CONTEXT_PATH:/api}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info,readiness,liveness
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    circuitbreakers:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    try-it-out-enabled: true
+
+nlp:
+  service:
+    base-url: ${NLP_BASE_URL:https://nlp-service:8000}
+    timeout-seconds: ${NLP_TIMEOUT:30}
+    max-batch-size: ${NLP_MAX_BATCH:50}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 100
+        permittedNumberOfCallsInHalfOpenState: 10
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 60000
+        failureRateThreshold: 50
+        slowCallRateThreshold: 100
+        slowCallDurationThreshold: 10000
+        recordExceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+    instances:
+      nlpService:
+        baseConfig: default
+
+  retry:
+    configs:
+      default:
+        registerHealthIndicator: false
+        maxAttempts: 3
+        waitDuration: 1000
+        retryExceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - java.io.IOException
+    instances:
+      nlpService:
+        baseConfig: default
+
+  ratelimiter:
+    configs:
+      default:
+        registerHealthIndicator: true
+        limitRefreshPeriod: 1m
+        limitForPeriod: 100
+        timeoutDuration: 5s
+    instances:
+      api:
+        baseConfig: default
+
+  timelimiter:
+    configs:
+      default:
+        cancelRunningFuture: false
+        timeoutDuration: 30s
+    instances:
+      nlpService:
+        baseConfig: default
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    root: WARN
+    com.maze.nlpcustomerffeedbackanalyzer: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+  file:
+    name: /var/log/feedback-analyzer/app.log
+    max-size: 100MB
+    max-history: 10
+
+audit:
+  enabled: true
+  log-changes: true
+  exclude-fields:
+    - rawNlpResult
+
