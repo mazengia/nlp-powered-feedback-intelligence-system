@@ -7,6 +7,8 @@ import com.maze.nlpcustomerffeedbackanalyzer.client.NlpServiceClient;
 import com.maze.nlpcustomerffeedbackanalyzer.feedback.FeedbackDTOs.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,9 +21,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class FeedbackService {
 
-    private final FeedbackRepository   repository;
+    private final FeedbackRepository repository;
     private final NlpServiceClient nlpClient;
-    private final ObjectMapper         mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     // ─── Analyze Single Feedback ──────────────────────────────────────────
 
@@ -82,9 +84,9 @@ public class FeedbackService {
         // Build payload for NLP batch endpoint
         List<Map<String, String>> nlpPayload = feedbackRequests.stream().map(req -> {
             Map<String, String> m = new HashMap<>();
-            m.put("text",         req.getText());
+            m.put("text", req.getText());
             m.put("feedbackType", req.getFeedbackType().name());
-            m.put("source",       req.getSource() != null ? req.getSource() : "unknown");
+            m.put("source", req.getSource() != null ? req.getSource() : "unknown");
             return m;
         }).collect(Collectors.toList());
 
@@ -121,10 +123,8 @@ public class FeedbackService {
 
     // ─── Queries ──────────────────────────────────────────────────────────
 
-    public List<FeedbackResponse> getAllFeedbacks() {
-        return repository.findAll().stream()
-                .map(f -> buildResponse(f, null))
-                .collect(Collectors.toList());
+    public Page<FeedbackResponse> getAllFeedbacks(Pageable pageable) {
+        return repository.findAll(pageable).map(f -> buildResponse(f, null));
     }
 
     public FeedbackResponse getFeedbackById(Long id) {
@@ -133,21 +133,18 @@ public class FeedbackService {
         return buildResponse(f, null);
     }
 
-    public List<FeedbackResponse> getFeedbacksByType(Feedback.FeedbackType type) {
-        return repository.findByFeedbackType(type).stream()
-                .map(f -> buildResponse(f, null))
-                .collect(Collectors.toList());
+    public Page<FeedbackResponse> getFeedbacksByType(Feedback.FeedbackType type, Pageable pageable) {
+        return repository.findByFeedbackType(type, pageable).map(f -> buildResponse(f, null));
     }
 
-    public List<FeedbackResponse> getFeedbacksBySentiment(Feedback.Sentiment sentiment) {
-        return repository.findBySentiment(sentiment).stream()
-                .map(f -> buildResponse(f, null))
-                .collect(Collectors.toList());
+
+    public Page<FeedbackResponse> getFeedbacksBySentiment(Feedback.Sentiment sentiment, Pageable pageable) {
+        return repository.findBySentiment(sentiment, pageable).map(f -> buildResponse(f, null));
     }
 
     public InsightsResult getInsights() {
         List<Object[]> sentimentCounts = repository.countBySentimentGrouped();
-        List<Object[]> topTopics       = repository.topTopics();
+        List<Object[]> topTopics = repository.topTopics();
 
         Map<String, Long> sentimentMap = new HashMap<>();
         long total = 0;
@@ -196,7 +193,10 @@ public class FeedbackService {
             JsonNode sentimentNode = nlpResult.path("sentiment");
             if (!sentimentNode.isMissingNode()) {
                 String s = sentimentNode.path("sentiment").asText("").toUpperCase();
-                try { feedback.setSentiment(Feedback.Sentiment.valueOf(s)); } catch (Exception ignored) {}
+                try {
+                    feedback.setSentiment(Feedback.Sentiment.valueOf(s));
+                } catch (Exception ignored) {
+                }
                 feedback.setSentimentConfidence(sentimentNode.path("confidence").asDouble());
             }
 
@@ -248,10 +248,21 @@ public class FeedbackService {
             }
             JsonNode t = nlpResult.path("topic");
             if (!t.isMissingNode()) {
+                List<Map<String, Object>> topTopics = null;
+                JsonNode topTopicsNode = t.path("top_topics");
+                if (!topTopicsNode.isMissingNode() && topTopicsNode.isArray()) {
+                    try {
+                        topTopics = mapper.convertValue(
+                                topTopicsNode,
+                                mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+                    } catch (Exception ignored) {
+                    }
+                }
                 topicResult = TopicResult.builder()
-                        .primaryTopic(t.path("primary_topic").asText())
+                        .primaryTopic(t.path("primary_topic").asText(null))
                         .confidence(t.path("confidence").asDouble())
-                        .feedbackType(t.path("feedback_type").asText())
+                        .topTopics(topTopics)
+                        .feedbackType(t.path("feedback_type").asText(null))
                         .build();
             }
             JsonNode kp = nlpResult.path("keyphrases");
@@ -262,13 +273,16 @@ public class FeedbackService {
                             mapper.getTypeFactory().constructCollectionType(List.class, Map.class)
                     );
                     kpResult = KeyphrasesResult.builder().keyphrases(phrases).build();
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
             JsonNode sm = nlpResult.path("summary");
             if (!sm.isMissingNode()) {
+                String summaryText = sm.path("summary").asText(null);
+                String note = sm.path("note").asText(null);
                 summaryResult = SummaryResult.builder()
-                        .summary(sm.path("summary").asText())
-                        .note(sm.path("note").asText(null))
+                        .summary(summaryText)
+                        .note(summaryText != null && !summaryText.isBlank() ? null : note)
                         .build();
             }
         } else {

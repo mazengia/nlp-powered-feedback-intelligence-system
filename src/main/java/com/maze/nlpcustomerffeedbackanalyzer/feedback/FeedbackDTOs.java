@@ -1,19 +1,19 @@
 package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 
- import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import lombok.*;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// REQUEST DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
 public class FeedbackDTOs {
 
-    /** Single feedback submission */
+    // ── Requests ──────────────────────────────────────────────────────────
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -21,35 +21,35 @@ public class FeedbackDTOs {
     public static class FeedbackRequest {
 
         @NotBlank(message = "Feedback text is required")
-        @Size(min = 3, max = 10000, message = "Text must be between 3 and 10000 characters")
+        @Size(min = 3, max = 10_000, message = "Text must be 3–10 000 characters")
         private String text;
 
         @Builder.Default
         private Feedback.FeedbackType feedbackType = Feedback.FeedbackType.GENERAL;
 
-        private String source;   // amazon, twitter, form, email, etc.
+        @Size(max = 100, message = "Source must not exceed 100 characters")
+        private String source;
     }
 
-    /** Batch feedback submission */
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class BatchFeedbackRequest {
-        private List<FeedbackRequest> feedbacks;
-//        @Builder.Default
-        // convenience: set a common feedback type for the whole batch
-        private Feedback.FeedbackType defaultFeedbackType = Feedback.FeedbackType.GENERAL;
-    }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESPONSE DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-    /** Rich analysis result returned to clients */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    public static class BatchFeedbackRequest {
+
+        @NotEmpty(message = "Feedbacks list must not be empty")
+        @Size(max = 50, message = "Maximum 50 items per batch")
+        @Valid
+        private List<FeedbackRequest> feedbacks;
+
+        /** Applied to any item whose feedbackType is null */
+        @Builder.Default
+        private Feedback.FeedbackType defaultFeedbackType = Feedback.FeedbackType.GENERAL;
+    }
+
+    // ── Responses ─────────────────────────────────────────────────────────
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class FeedbackResponse {
         private Long   id;
         private String text;
@@ -57,10 +57,10 @@ public class FeedbackDTOs {
         private String source;
         private String language;
 
-        private SentimentResult    sentiment;
-        private TopicResult        topic;
-        private KeyphrasesResult   keyphrases;
-        private SummaryResult      summary;
+        private SentimentResult  sentiment;
+        private TopicResult      topic;
+        private KeyphrasesResult keyphrases;
+        private SummaryResult    summary;
 
         private Feedback.AnalysisStatus analysisStatus;
         private LocalDateTime           createdAt;
@@ -78,10 +78,10 @@ public class FeedbackDTOs {
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class TopicResult {
-        private String       primaryTopic;
-        private Double       confidence;
+        private String                    primaryTopic;
+        private Double                    confidence;
         private List<Map<String, Object>> topTopics;
-        private String       feedbackType;
+        private String                    feedbackType;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
@@ -95,31 +95,28 @@ public class FeedbackDTOs {
         private String note;
     }
 
-    /** Batch analysis result */
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class BatchFeedbackResponse {
-        private Integer              count;
+        private int                    count;
         private List<FeedbackResponse> results;
-        private InsightsResult       insights;
+        private InsightsResult         insights;
     }
 
-    /** Aggregate insights across a batch */
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class InsightsResult {
-        private Integer            totalFeedbacks;
+        private int                totalFeedbacks;
         private Map<String, Long>  sentimentDistribution;
-        private Double             positiveRatePct;
-        private Double             negativeRatePct;
+        private double             positiveRatePct;
+        private double             negativeRatePct;
         private Map<String, Long>  topTopics;
         private Map<String, Long>  topKeyphrases;
-        private String             alert;  // e.g. "High negative feedback detected!"
+        private String             alert;
     }
 
-    /** Generic API error response */
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class ErrorResponse {
-        private String message;
-        private String details;
+        private String        message;
+        private String        details;
         private LocalDateTime timestamp;
     }
 }

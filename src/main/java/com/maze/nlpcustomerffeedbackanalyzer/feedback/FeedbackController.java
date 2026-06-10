@@ -6,28 +6,29 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/feedback")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@Tag(name = "Feedback Analyzer", description = "Analyze customer feedback using NLP & LLM")
+@Tag(name = "Feedback Analyzer", description = "Analyze customer feedback using NLP — sentiment, topics, keyphrases, summarization, Amharic support")
 public class FeedbackController {
 
     private final FeedbackService feedbackService;
 
-    // ─── Analyze ──────────────────────────────────────────────────────────
 
     @PostMapping("/analyze")
     @Operation(
-        summary     = "Analyze a single feedback",
-        description = "Runs full NLP pipeline: sentiment, topic classification, key phrases, and summarization. Supports Amharic."
-    )
+            summary     = "Analyze a single feedback",
+            description = "Runs the full NLP pipeline: sentiment, topic classification, key phrases, and summarization. Supports Amharic.")
     public ResponseEntity<FeedbackResponse> analyzeFeedback(
             @Valid @RequestBody FeedbackRequest request) {
         return ResponseEntity.ok(feedbackService.analyzeFeedback(request));
@@ -35,20 +36,19 @@ public class FeedbackController {
 
     @PostMapping("/analyze/batch")
     @Operation(
-        summary     = "Analyze multiple feedbacks at once",
-        description = "Batch analysis with aggregate insights. Max 50 items per request."
-    )
+            summary     = "Analyze multiple feedbacks at once",
+            description = "Batch analysis with aggregate insights. Max 50 items per request.")
     public ResponseEntity<BatchFeedbackResponse> analyzeBatch(
             @Valid @RequestBody BatchFeedbackRequest request) {
         return ResponseEntity.ok(feedbackService.analyzeBatch(request));
     }
 
-    // ─── Read ─────────────────────────────────────────────────────────────
 
     @GetMapping
-    @Operation(summary = "Get all analyzed feedbacks")
-    public ResponseEntity<List<FeedbackResponse>> getAllFeedbacks() {
-        return ResponseEntity.ok(feedbackService.getAllFeedbacks());
+    @Operation(summary = "Get all analyzed feedbacks (paginated)")
+    public ResponseEntity<Page<FeedbackResponse>> getAllFeedbacks(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(feedbackService.getAllFeedbacks(pageable));
     }
 
     @GetMapping("/{id}")
@@ -59,40 +59,39 @@ public class FeedbackController {
     }
 
     @GetMapping("/type/{feedbackType}")
-    @Operation(summary = "Get feedbacks filtered by type")
-    public ResponseEntity<List<FeedbackResponse>> getByType(
-            @PathVariable Feedback.FeedbackType feedbackType) {
-        return ResponseEntity.ok(feedbackService.getFeedbacksByType(feedbackType));
+    @Operation(summary = "Get feedbacks filtered by type (paginated)")
+    public ResponseEntity<Page<FeedbackResponse>> getByType(
+            @PathVariable Feedback.FeedbackType feedbackType,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(feedbackService.getFeedbacksByType(feedbackType, pageable));
     }
 
     @GetMapping("/sentiment/{sentiment}")
-    @Operation(summary = "Get feedbacks filtered by sentiment")
-    public ResponseEntity<List<FeedbackResponse>> getBySentiment(
-            @PathVariable Feedback.Sentiment sentiment) {
-        return ResponseEntity.ok(feedbackService.getFeedbacksBySentiment(sentiment));
+    @Operation(summary = "Get feedbacks filtered by sentiment (paginated)")
+    public ResponseEntity<Page<FeedbackResponse>> getBySentiment(
+            @PathVariable Feedback.Sentiment sentiment,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(feedbackService.getFeedbacksBySentiment(sentiment, pageable));
     }
 
-    // ─── Insights ─────────────────────────────────────────────────────────
 
     @GetMapping("/insights")
     @Operation(
-        summary     = "Get aggregate insights",
-        description = "Returns sentiment distribution, top topics, negative rate alert, and key statistics across all stored feedbacks."
-    )
+            summary     = "Get aggregate insights",
+            description = "Sentiment distribution, top topics, negative-rate alert, and statistics across all stored feedbacks.")
     public ResponseEntity<InsightsResult> getInsights() {
         return ResponseEntity.ok(feedbackService.getInsights());
     }
 
-    // ─── Health ───────────────────────────────────────────────────────────
 
     @GetMapping("/health")
     @Operation(summary = "Health check for the NLP service connection")
     public ResponseEntity<Map<String, Object>> healthCheck() {
-        boolean nlpHealthy = feedbackService.isNlpServiceHealthy();
+        boolean nlpUp = feedbackService.isNlpServiceHealthy();
         return ResponseEntity.ok(Map.of(
                 "backend",    "UP",
-                "nlpService", nlpHealthy ? "UP" : "DOWN",
-                "status",     nlpHealthy ? "ALL_SYSTEMS_GO" : "NLP_UNAVAILABLE"
+                "nlpService", nlpUp ? "UP" : "DOWN",
+                "status",     nlpUp ? "ALL_SYSTEMS_GO" : "NLP_UNAVAILABLE"
         ));
     }
 }

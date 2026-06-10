@@ -1,5 +1,7 @@
 package com.maze.nlpcustomerffeedbackanalyzer.feedback;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -9,15 +11,15 @@ import java.util.List;
 @Repository
 public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
-    List<Feedback> findByFeedbackType(Feedback.FeedbackType feedbackType);
+    Page<Feedback> findByFeedbackType(Feedback.FeedbackType feedbackType, Pageable pageable);
 
-    List<Feedback> findBySentiment(Feedback.Sentiment sentiment);
+    Page<Feedback> findBySentiment(Feedback.Sentiment sentiment, Pageable pageable);
 
     List<Feedback> findByAnalysisStatus(Feedback.AnalysisStatus status);
 
-    List<Feedback> findBySource(String source);
+    Page<Feedback> findBySource(String source, Pageable pageable);
 
-    List<Feedback> findByLanguage(String language);
+    Page<Feedback> findByLanguage(String language, Pageable pageable);
 
     long countBySentiment(Feedback.Sentiment sentiment);
 
@@ -26,6 +28,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     @Query("SELECT f.sentiment, COUNT(f) FROM Feedback f GROUP BY f.sentiment")
     List<Object[]> countBySentimentGrouped();
 
-    @Query("SELECT f.primaryTopic, COUNT(f) FROM Feedback f WHERE f.primaryTopic IS NOT NULL GROUP BY f.primaryTopic ORDER BY COUNT(f) DESC")
+    @Query("""
+           SELECT f.primaryTopic, COUNT(f)
+             FROM Feedback f
+            WHERE f.primaryTopic IS NOT NULL
+            GROUP BY f.primaryTopic
+            ORDER BY COUNT(f) DESC
+           """)
     List<Object[]> topTopics();
 }
